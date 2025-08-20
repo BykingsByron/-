@@ -1,0 +1,69 @@
+import random
+from datetime import datetime
+import tkinter as tk
+from tkinter import messagebox
+
+# 抽奖概率配置 (总和应该为100)
+lottery_items = [
+    ("滚你妈的", 10),
+    ("去你妈的", 10),
+    ("你也配？", 10),
+    ("傻逼二次元", 10),
+    ("癔症又犯了？", 10),
+    ("死男同真恶心", 5),
+    ("现在是幻想时刻", 5),
+    ("柚子厨滚出去", 5),
+    ("这是最后通牒", 5),
+    ("以后不要再和我扯上关系", 5),
+    ("被拉黑+屏蔽", 5),
+    ("小男娘", 5),
+    ("随机的网图", 2.5),
+    ("随机的贴吧圣经", 2.5),
+    ("下次再说吧", 2.5),
+    ("你是个好人", 2.5),
+    ("我一直把你当好朋友", 2.5),
+    ("滚出去", 2.49),
+    ("好呀宝宝", 0.01)
+]
+
+# 活动结束日期
+END_DATE = datetime(2025, 8, 29)
+
+# 构建概率列表
+def build_probability_list(items):
+    prob_list = []
+    for item, prob in items:
+        # 扩大100倍处理小数概率
+        count = int(prob * 100)
+        prob_list.extend([item] * count)
+    return prob_list
+
+probability_list = build_probability_list(lottery_items)
+
+def handle_lottery_gui():
+    now = datetime.now()
+    if now > END_DATE:
+        messagebox.showinfo("抽奖结果", f"🎉七夕限定卡池已结束💔\n活动已于{END_DATE.strftime('%Y年%m月%d日')}结束，感谢参与！")
+        return
+
+    result = random.choice(probability_list)
+    if result == "好呀宝宝":
+        response = f"💘恭喜你抽中限定SSR「{result}」💕\n你是天选之子！"
+    else:
+        response = f"🎰你的抽签结果是：「{result}」\n继续努力，下一次可能会抽到限定SSR哦！"
+    messagebox.showinfo("抽奖结果", response)
+
+if __name__ == "__main__":
+    # 创建窗口
+    root = tk.Tk()
+    root.title("抽奖程序")
+    root.geometry("300x150")
+
+    label = tk.Label(root, text="点击按钮进行抽奖", font=("思源黑体", 12))
+    label.pack(pady=20)
+
+    button = tk.Button(root, text="咱俩试试？", font=("思源黑体", 12), command = handle_lottery_gui)
+    button.pack(pady=10)
+
+    root.mainloop()
+
