@@ -2,23 +2,29 @@ import random
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
+import requests
+from bs4 import BeautifulSoup
+from PIL import Image, ImageTk
+import io
+import sys
+import os
 
 # 抽奖概率配置 (总和应该为100)
 lottery_items = [
-    ("滚你妈的", 10),
-    ("去你妈的", 10),
-    ("你也配？", 10),
-    ("傻逼二次元", 10),
-    ("癔症又犯了？", 10),
-    ("死男同真恶心", 5),
-    ("现在是幻想时刻", 5),
-    ("柚子厨滚出去", 5),
-    ("这是最后通牒", 5),
-    ("以后不要再和我扯上关系", 5),
-    ("被拉黑+屏蔽", 5),
-    ("小男娘", 5),
-    ("随机的网图", 2.5),
-    ("随机的贴吧圣经", 2.5),
+    ("滚你妈的", 2.5),
+    ("去你妈的", 2.5),
+    ("你也配？", 2.5),
+    ("傻逼二次元", 1.5),
+    ("癔症又犯了？", 2.5),
+    ("死男同真恶心", 2.5),
+    ("现在是幻想时刻", 1.5),
+    ("柚子厨滚出去", 2.5),
+    ("这是最后通牒", 2.5),
+    ("以后不要再和我扯上关系", 2.5),
+    ("被拉黑+屏蔽", 1.5),
+    ("小男娘", 1.5),
+    ("随机的网图", 32),
+    ("随机的贴吧圣经", 32),
     ("下次再说吧", 2.5),
     ("你是个好人", 2.5),
     ("我一直把你当好朋友", 2.5),
@@ -28,6 +34,44 @@ lottery_items = [
 
 # 活动结束日期
 END_DATE = datetime(2025, 8, 29)
+
+# 获取文件路径（打包前用当前目录，打包后用临时目录）
+def get_resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        # 打包后的路径（exe运行时会解压到临时文件夹）
+        return os.path.join(sys._MEIPASS, relative_path)
+    # 打包前的路径（开发时）
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+# 网图素材池
+def load_net_images(filepath="net_images.txt"):
+    path = get_resource_path(filepath)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        print("网图文件读取失败:", e)
+        return []
+
+# 贴吧圣经素材池（从文件读取）
+def load_tieba_quotes(filepath="tieba_quotes.txt"):
+    path = get_resource_path(filepath)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            segments = []
+            for seg in content.split('\n\n'):
+                seg = seg.strip()
+                if seg:
+                    segments.append(seg)
+            return segments
+    except Exception as e:
+        print("贴吧圣经文件读取失败:", e)
+        return []
+
+net_images = load_net_images()
+tieba_quotes = load_tieba_quotes()
 
 # 构建概率列表
 def build_probability_list(items):
@@ -40,18 +84,53 @@ def build_probability_list(items):
 
 probability_list = build_probability_list(lottery_items)
 
-def handle_lottery_gui():
+def lottery():
     now = datetime.now()
     if now > END_DATE:
-        messagebox.showinfo("抽奖结果", f"🎉七夕限定卡池已结束💔\n活动已于{END_DATE.strftime('%Y年%m月%d日')}结束，感谢参与！")
-        return
-
+        return f"🎉七夕限定卡池已结束💔\n活动已于{END_DATE.strftime('%Y年%m月%d日')}结束，感谢参与！"
     result = random.choice(probability_list)
     if result == "好呀宝宝":
-        response = f"💘恭喜你抽中限定SSR「{result}」💕\n你是天选之子！"
+        return f"💘恭喜你抽中限定SSR「{result}」💕\n你是天选之子！"
+    elif result == "随机的网图":
+        img_url = random.choice(net_images) if net_images else "暂无网图素材"
+        return f"🎰你的抽签结果是：「{result}」\n随机网图：{img_url}"
+    elif result == "随机的贴吧圣经":
+        quote = random.choice(tieba_quotes) if tieba_quotes else "暂无圣经素材"
+        return f"🎰你的抽签结果是：「{result}」\n {quote}"
     else:
-        response = f"🎰你的抽签结果是：「{result}」\n继续努力，下一次可能会抽到限定SSR哦！"
-    messagebox.showinfo("抽奖结果", response)
+        return f"🎰你的抽签结果是：「{result}」\n继续努力，下一次可能会抽到限定SSR哦！"
+
+img_win_global = None  # 保存当前图片窗口
+
+def handle_lottery_gui():
+    global img_win_global
+    # 如果有旧图片窗口，先关闭
+    if img_win_global is not None and img_win_global.winfo_exists():
+        img_win_global.destroy()
+        img_win_global = None
+
+    result = lottery()
+    if result.startswith("🎰你的抽签结果是：「随机的网图」"):
+        # 提取图片链接
+        img_url = result.split("随机网图：")[-1].strip()
+        try:
+            resp = requests.get(img_url, timeout=5)
+            img_data = resp.content
+            img = Image.open(io.BytesIO(img_data))
+            img = img.resize((300, 300))  # 可根据需要调整大小
+            img_tk = ImageTk.PhotoImage(img)
+            img_win = tk.Toplevel()
+            img_win.title("抽奖结果")
+            tk.Label(img_win, text="你的抽签结果是：", font=("思源黑体", 12)).pack(pady=10)
+            tk.Label(img_win, image=img_tk).pack(pady=10)
+            img_win.img_tk = img_tk  # 防止被垃圾回收
+            # 增加确定按钮
+            tk.Button(img_win, text="确定", font=("思源黑体", 12), command=img_win.destroy).pack(pady=10)
+            img_win_global = img_win
+        except Exception as e:
+            messagebox.showinfo("抽奖结果", f"图片加载失败：{e}\n{result}")
+    else:
+        messagebox.showinfo("抽奖结果", result)
 
 if __name__ == "__main__":
     # 创建窗口
@@ -64,6 +143,11 @@ if __name__ == "__main__":
 
     button = tk.Button(root, text="咱俩试试？", font=("思源黑体", 12), command = handle_lottery_gui)
     button.pack(pady=10)
-
+    handle_lottery_gui()
+    
+    root.mainloop()
+    button.pack(pady=10)
+    handle_lottery_gui()
+    
     root.mainloop()
 
